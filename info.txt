@@ -1,4 +1,4 @@
-Florida Case Count
+Florida Case Count, as of March 26, 2020
 
 Under Reporting Adapted from:
 https://cmmid.github.io/topics/covid19/severity/global_cfr_estimates.html
