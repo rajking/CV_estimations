@@ -1,0 +1,31 @@
+Florida Case Count
+
+Under Reporting Adapted from:
+https://cmmid.github.io/topics/covid19/severity/global_cfr_estimates.html
+
+Log Plot created by  Amin Adibi:
+https://www.shefa.ca/portfolio/covid19-trajectory-in-canada/
+
+Metro Areas are combination of the follwoing Florida Counties:
+
+Tampa Metro
+  Hillsborough county
+  Pinellas County
+  Pasco County
+  Hernando County
+
+Orlando Metro 
+  Orange County
+  Seminol county
+  Osceola County
+  Lake County
+
+Miami Metro
+  Dade County
+  Broward County
+  Palm Beach County
+  
+  
+Florida Data from dept of health:
+https://fdoh.maps.arcgis.com/apps/opsdashboard/index.html#/8d0de33f260d444c852a615dc7837c86
+
