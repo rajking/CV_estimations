@@ -1,92 +1,268 @@
-library(stringr)
 library(tidyverse)
 library(lubridate)
-library(ggthemes)
+library(padr)
+library(devtools)
+library(NCoVUtils) # install_github("https://github.com/epiforecasts/NCoVUtils")
+library(readxl)
+library(ggplot2)
 library(scales)
+library(cowplot)
+library(patchwork)
+library(stringr)
+library(ggthemes)
 library(RColorBrewer)
 library(ggrepel)
-library(ggplot2)
+library(rmarkdown)
+library(knitr)
 
 
-#Data import
-caseType <- "Confirmed"
-caseType <- "confirmed_global"
-time_series_19_covid_Confirmed <- read_csv("time_series_covid19_confirmed_florida.csv")
+# Updated on 3/30/2020
 
-covidCases <- time_series_19_covid_Confirmed %>% rename (country = "Country/Region") %>% rename (name = "Province/State")
+# Log Chart of Covid new_cases in Florida
+# The script was adapted from original code by Amin Adibi
+# available at https://www.shefa.ca/portfolio/covid19-trajectory-in-canada/
+
+# Under-reporting
+# Original paper from: https://cmmid.github.io/topics/covid19/severity/global_cfr_estimates.html
+# Code from: https://github.com/thimotei/CFR_calculation
+
+
+
+# get data
+#Data import from NYtime github repository
+USA_counties <- read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
+
+# filter to florida
+Florida_counties <- USA_counties %>%
+  filter(state=="Florida")
+
+# Case count for Florida
+Florida <- Florida_counties %>%
+  select(date,state,cases,deaths) %>%
+  group_by(date) %>%
+  mutate(state = state) %>%
+  mutate(cases = sum(cases)) %>%
+  mutate(deaths = sum(deaths)) %>%
+  filter(row_number() == 1) %>% #removes duplicate rows by filtering only 1st one
+  mutate(name = "Florida")
+
+# Case count for Jacksonville Metro Area  
+Jacksonville <- Florida_counties %>%
+  select(date, county, state, cases, deaths) %>%
+  group_by(date) %>%
+  filter(county == "Duval" | county == "St. Johns" | county == "Clay") %>%
+  mutate(cases = sum(cases)) %>%
+  mutate(deaths = sum(deaths)) %>%
+  mutate(county = "Jacksonville") %>%
+  filter(row_number() == 1) %>%
+  rename (name = "county")
+
+# Case count for Miami Metro Area  
+Miami <- Florida_counties %>%
+  select(date, county, state, cases, deaths) %>%
+  group_by(date) %>%
+  filter(county == "Miami-Dade" | county == "	Broward" | county == "Palm Beach") %>%
+  mutate(cases = sum(cases)) %>%
+  mutate(deaths = sum(deaths)) %>%
+  mutate(county = "Miami") %>%
+  filter(row_number() == 1) %>%
+  rename (name = "county")
+
+# Case count for Orlando Metro Area  
+Orlando <- Florida_counties %>%
+  select(date, county, state, cases, deaths) %>%
+  group_by(date) %>%
+  filter(county == "Orange" | county == "Osceola" | county == "Lake" | county == "Seminole") %>%
+  mutate(cases = sum(cases)) %>%
+  mutate(deaths = sum(deaths)) %>%
+  mutate(county = "Orlando") %>%
+  filter(row_number() == 1) %>%
+  rename (name = "county")
+
+
+# Case count for Tampa Metro Area  
+Tampa <- Florida_counties %>%
+  select(date, county, state, cases, deaths) %>%
+  group_by(date) %>%
+  filter(county == "Hillsborough" | county == "Pinellas" | county == "Pasco" | county == "Hernando") %>%
+  mutate(cases = sum(cases)) %>%
+  mutate(deaths = sum(deaths)) %>%
+  mutate(county = "Tampa") %>%
+  filter(row_number() == 1) %>%
+  rename (name = "county")
+
+# Bind data together
+allDat <- rbind(Florida,Miami,Orlando,Tampa,Jacksonville)
+
+
+
+# Under-reporting
+# Original paper from: https://cmmid.github.io/topics/covid19/severity/global_cfr_estimates.html
+# Code from: https://github.com/thimotei/CFR_calculation
+
+
+zmeanHDT <- 13
+zsdHDT <- 12.7
+zmedianHDT <- 9.1
+muHDT <- log(zmedianHDT)
+sigmaHDT <- sqrt(2*(log(zmeanHDT) - muHDT))
+cCFRBaseline <- 1.38
+cCFREstimateRange <- c(1.23, 1.53)
+cCFRIQRRange <- c(1.3, 1.4)
+
+
+
+# Hospitalisation to death distribution
+hospitalisation_to_death_truncated <- function(x)
+{
+  dlnorm(x, muHDT, sigmaHDT)
+}
+
+# Function to work out correction CFR
+scale_cfr <- function(data_1_in, delay_fun){
+  case_incidence <- data_1_in$new_cases
+  death_incidence <- data_1_in$new_deaths
+  cumulative_known_t <- 0 # cumulative cases with known outcome at time tt
+  # Sum over cases up to time tt
+  for(ii in 1:nrow(data_1_in)){
+    known_i <- 0 # number of cases with known outcome at time ii
+    for(jj in 0:(ii - 1)){
+      known_jj <- (case_incidence[ii - jj]*delay_fun(jj))
+      known_i <- known_i + known_jj
+    }
+    cumulative_known_t <- cumulative_known_t + known_i # Tally cumulative known
+  }
+  # naive CFR value
+  b_tt <- sum(death_incidence)/sum(case_incidence) 
+  # corrected CFR estimator
+  p_tt <- sum(death_incidence)/cumulative_known_t
+  data.frame(nCFR = b_tt, cCFR = p_tt, total_deaths = sum(death_incidence), 
+             cum_known_t = round(cumulative_known_t), total_cases = sum(case_incidence))
+}
+
+
+allDatDesc <- allDat %>% 
+  dplyr::ungroup() %>%
+  dplyr::arrange(name, date) %>% 
+  dplyr::mutate(date = lubridate::ymd(date)) %>% 
+  dplyr::rename(new_cases = cases, new_deaths = deaths) %>%
+  dplyr::select(date, name, new_cases, new_deaths) 
+
+# Do analysis
+allTogetherClean2 <- allDatDesc %>%
+  dplyr::group_by(name) %>%
+  padr::pad() %>%
+  dplyr::mutate(new_cases = tidyr::replace_na(new_cases, 0),
+                new_deaths = tidyr::replace_na(new_deaths, 0)) %>%
+  dplyr::group_by(name) %>%
+  dplyr::mutate(cum_deaths = sum(new_deaths)) %>%
+  dplyr::filter(cum_deaths > 0) %>%
+  dplyr::select(-cum_deaths) %>%
+  dplyr::do(scale_cfr(., delay_fun = hospitalisation_to_death_truncated)) %>%
+  dplyr::filter(cum_known_t > 0) %>%
+  dplyr::mutate(nCFR_UQ = binom.test(total_deaths, total_cases)$conf.int[2],
+                nCFR_LQ = binom.test(total_deaths, total_cases)$conf.int[1],
+                cCFR_UQ = binom.test(total_deaths, cum_known_t)$conf.int[2],
+                cCFR_LQ = binom.test(total_deaths, cum_known_t)$conf.int[1],
+                underreporting_estimate = cCFRBaseline / (100*cCFR),
+                lower = cCFREstimateRange[1] / (100 * cCFR_UQ),
+                upper = cCFREstimateRange[2] / (100 * cCFR_LQ),
+                quantile25 = binom.test(total_deaths, cum_known_t, conf.level = 0.5)$conf.int[1],
+                quantile75 = binom.test(total_deaths, cum_known_t, conf.level = 0.5)$conf.int[2],
+                bottom = cCFRIQRRange[1] / (100 * quantile75),
+                top = cCFRIQRRange[2] / (100 * quantile25)) %>%
+  dplyr::filter(total_deaths > 10)
+
+#confidence = dplyr::case_when(total_deaths >= 100 ~ "Countries which have reported 100 or more deaths",
+#                              total_deaths < 100 && total_deaths > 10  ~ "Countries that have reported fewer than 100 deaths, but more than 10",
+#                              total_deaths >= 5 && total_deaths <= 10 ~ "Countries that have reported greater than or equal to 5 deaths") %>%
+#                               
+# factor(levels = c("Countries which have reported 100 or more deaths",
+#                   "Countries that have reported fewer than 100 deaths, but more than 10", 
+#                   "Countries that have reported greater than or equal to 5 deaths"))
+
+reportDataFinal <- allTogetherClean2 %>%
+  dplyr::select(name, total_cases, total_deaths, underreporting_estimate, lower,
+                upper, bottom, top) %>%
+  #dplyr::mutate(is.numeric, signif, digits=2)  %>%
+  dplyr::mutate(underreporting_estimate = ifelse(underreporting_estimate <= 1, underreporting_estimate, 1)) %>%
+  dplyr::mutate(upper = ifelse(upper <= 1, upper, 1)) %>%
+  dplyr::mutate(top = ifelse(top <= 1, top, 1)) %>%
+  dplyr::mutate(underreporting_estimate = signif(underreporting_estimate, 2)) %>%
+  dplyr::mutate(lower = signif(lower, 2)) %>%
+  dplyr::mutate(upper = signif(upper, 2)) %>%
+  dplyr::mutate(bottom = signif(bottom, 2)) %>%
+  dplyr::mutate(top = signif(top, 2)) %>%
+  dplyr::ungroup(name) %>%
+  dplyr::mutate(name = name %>% stringr::str_replace_all("_", " ")) %>% 
+  dplyr::mutate(underreporting_estimate_clean = paste0(underreporting_estimate*100,
+                                                       "% (",lower*100,"% - ",upper*100,"%)"))
+
+
+
+
+# plot results
+dataTable <- reportDataFinal %>% dplyr::select(name, underreporting_estimate_clean, total_cases, total_deaths)
+
+dataPlot <- reportDataFinal %>% 
+  dplyr::mutate(
+    name = name  %>% 
+      factor(levels = reportDataFinal %>% 
+               dplyr::arrange(desc(underreporting_estimate)) %>% 
+               dplyr::pull(name) %>% 
+               unique()))
+
+#subPlotData1 <- dataPlot %>% filter(confidence == "Countries which have reported 100 or more deaths")
+#subPlotData2 <- dataPlot %>% filter(confidence == "Countries that have reported fewer than 100 deaths, but more than 10")
+#subPlotData3 <- dataPlot %>% filter(confidence == "Countries that have reported fewer than or equal to 10 deaths")
+
+UR_plot <- dataPlot %>% 
+  ggplot2::ggplot(ggplot2::aes(x = name)) +
+  #ggplot2::geom_linerange(ggplot2::aes(ymin = bottom, ymax = top), col = "#344b85", size = 4,  alpha = 0.7) +
+  ggplot2::geom_linerange(ggplot2::aes(ymin = lower, ymax = upper), col = "#344b85",  size = 4,  alpha = 0.7) +
+  ggplot2::scale_y_continuous(labels = scales::percent_format(accuracy = 1L), limits=c(0,1),  breaks = seq(0, 1, 0.1)) +
+  ggplot2::geom_hline(yintercept = 0, linetype = 2) +
+  ggplot2::geom_hline(yintercept = 1, linetype = 2) +
+  cowplot::theme_cowplot() +
+  cowplot::panel_border() +
+  ggplot2::theme(axis.text.x = element_text(angle = 0, size = 15), axis.text.y = element_text(size = 15)) +
+  ggplot2::theme(legend.position = "none") +
+  ggplot2::guides(col = ggplot2::guide_legend(nrow = 2)) +
+  ggplot2::labs(x = "Region", y = "Percentage of cases reported") + 
+  ggplot2::coord_flip() + 
+  ggplot2::ggtitle("Estimates for percentage of symptomatic cases reported in Florida", subtitle = "For Metro areas with greater than 10 deaths") +
+  ggplot2::theme(text = element_text(size=13)) +
+  ggplot2::theme(legend.position = "none") +
+  ggplot2::theme(legend.title=element_blank()) +
+  ggplot2::labs(caption = paste0("Last updated: ", allDat[[nrow(allDat),1]])) 
+
+
+
+
+# Log Chart of Covid new_cases in Florida
+# The script was adapted from original code by Amin Adibi
+# available at https://www.shefa.ca/portfolio/covid19-trajectory-in-canada/
+
+
 colourBlindPal <- c("#E69F00", "#D55E00", "#009E73", "#56B4E9", "#CC79A7", "#0072B2")        
 
-lineDataCases <- covidCases %>% 
-  select (-c(country)) %>% 
-  pivot_longer(cols = -1, names_to = "date", values_to = "Cases") %>%  mutate(date=mdy(date)) %>%
-  filter (Cases>=10) %>% arrange (name, date) %>% 
+lineDatanew_cases <- allDatDesc %>% 
+  select (new_cases,new_deaths,name,date) %>% 
+  filter (new_cases>=10) %>% arrange (name, date) %>% 
   group_by(name) %>% mutate(date = date - date[1L]) %>%
   mutate(days = as.numeric(date)) #%>% filter(days <30)
 
-lastDay <- max(lineDataCases$days)+10  
-
-#plot 100k y-axis
-plot100k <- ggplot(data = lineDataCases, aes(x=days, y=Cases, colour = name)) +
-  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th cases") + 
-  ylab ("Cases \n") +
-  geom_text_repel(data = lineDataCases %>% 
-                    filter(days == last(days)), aes(label = name, 
-                                                    x = days + 0.2, 
-                                                    y = Cases, 
-                                                    color = name,
-                                                    fontface=2), size = 5) + 
-
-  scale_y_continuous(trans = log10_trans(),
-                     breaks = c(10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000),labels = comma) +
-  scale_x_continuous(breaks = c(0,5,10,15,20,25,30)) +
-  
-  annotate("segment", linetype = "longdash", 
-           x = 0, xend = lastDay, y = 10, yend = 10*(2^(1/3))^lastDay,
-           colour = "#333333") +
-  
-  annotate(geom = "text", x = 26, y = 6000, 
-           label = "... every 3 days", color = "#333333", fontface=2,
-           angle = 33) +
-  
-  
-  annotate("segment", linetype = "longdash", 
-           x = 0, xend = lastDay, y = 10, yend = 10*(2^(1/7))^lastDay,
-           colour = "#333333") +
-  annotate(geom = "text", x = 26, y = 188, 
-           label = "... every week", color = "#333333", fontface=2,
-           angle = 20) +
-  
-  annotate("segment", linetype = "longdash", 
-           x = 0, xend = 26.5, y = 10, yend = 10*(2^(1/2))^26.5,
-           colour = "#333333") +
-  annotate(geom = "text", x = 23.2, y = 45000, 
-           label = "... every 2 days", color = "#333333", fontface=2,
-           angle = 43) +
-  
-  annotate("segment", linetype = "longdash", 
-           x = 0, xend = 13.2, y = 10, yend = 10*(2)^13.2,
-           colour = "#333333") +
-  annotate(geom = "text", x = 11.2, y = 45000, 
-           label = "doubles every day", color = "#333333", fontface=2,
-           angle = 60) +
-  
-  scale_colour_manual(values=colourBlindPal) +
-  theme_economist() + 
-  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of cases by days since 10th case") +
-  theme(text = element_text(size=13)) +
-  theme(legend.position = "none") +
-  theme(legend.title=element_blank()) +
-  labs(caption = paste0("Last updated: ", ymd(mdy(colnames(covidCases[length(covidCases)]))))) 
+lastDay <- max(lineDatanew_cases$days)+10  
 
 
 # plot 10k y axis
-plot10k <- ggplot(data = lineDataCases, aes(x=days, y=Cases, colour = name)) +
-  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th cases") + 
-  ylab ("Cases \n") +
-  geom_text_repel(data = lineDataCases %>% 
+plot10k <- ggplot(data = lineDatanew_cases, aes(x=days, y=new_cases, colour = name)) +
+  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th new_cases") + 
+  ylab ("new_cases \n") +
+  geom_text_repel(data = lineDatanew_cases %>% 
                     filter(days == last(days)), aes(label = name, 
                                                     x = days + 0.2, 
-                                                    y = Cases, 
+                                                    y = new_cases, 
                                                     color = name,
                                                     fontface=2), size = 5) + 
   
@@ -121,29 +297,33 @@ plot10k <- ggplot(data = lineDataCases, aes(x=days, y=Cases, colour = name)) +
   
   scale_colour_manual(values=colourBlindPal) +
   theme_economist() + 
-  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of cases by days since 10th case") +
+  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of new_cases by days since 10th case") +
   theme(text = element_text(size=13)) +
   theme(legend.position = "none") +
   theme(legend.title=element_blank()) +
-  labs(caption = paste0("Last updated: ", ymd(mdy(colnames(covidCases[length(covidCases)]))))) 
+  labs(caption = paste0("Last updated: ", allDatDesc[[nrow(allDatDesc),1]])) 
 
 
 #plot regions only
-region <- subset(lineDataCases,name=="Miami Area" | name=="Tampa Area" | name=="Orlando Area")
+region <- subset(lineDatanew_cases,name=="Miami" | name=="Tampa" | name=="Orlando" | name=="Jacksonville")
 
-plot_region <- ggplot(data = region, aes(x=days, y=Cases, colour = name)) +
-  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th cases") + 
-  ylab ("Cases \n") +
+plot_region <- ggplot(data = region, aes(x=days, y=new_cases, colour = name)) +
+  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th new_cases") + 
+  ylab ("new_cases \n") +
   geom_text_repel(data = region %>% 
                     filter(days == last(days)), aes(label = name, 
                                                     x = days + 0.2, 
-                                                    y = Cases, 
+                                                    y = new_cases, 
                                                     color = name,
                                                     fontface=2), size = 5) + 
   
   scale_y_continuous(trans = log10_trans(),
                      breaks = c(10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000),labels = comma) +
   scale_x_continuous(breaks = c(0,5,10,15,20,25,30)) +
+  
+  annotate(geom = "text", x = 25, y = 28, 
+           label = "Miami Counties: Dade + Broward + Palm Beach\n Tampa Counties: Hillsborough + Pinellas + Pasco + Hernando 
+  Orlando Counties: Orange + Seminol + Osceola + Lake\n Jacksonville Counties: Duval + Clay + St.John\n", color = "#333333", size=3) +
   
   annotate("segment", linetype = "longdash", 
            x = 0, xend = lastDay, y = 10, yend = 10*(2^(1/3))^lastDay,
@@ -172,17 +352,24 @@ plot_region <- ggplot(data = region, aes(x=days, y=Cases, colour = name)) +
   
   scale_colour_manual(values=colourBlindPal) +
   theme_economist() + 
-  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of cases by days since 10th case") +
+  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of new_cases by days since 10th case\n") +
   theme(text = element_text(size=13)) +
   theme(legend.position = "none") +
   theme(legend.title=element_blank()) +
-  labs(caption = paste0("Last updated: ", ymd(mdy(colnames(covidCases[length(covidCases)]))))) 
+  labs(caption = paste0("Last updated: ", allDatDesc[[nrow(allDatDesc),1]])) 
 
 
-#plots
-# plot100k
-# plot10k
+# CHARTS & PLOTS
 
-plot_region
+
+# Under Reporting
+# UR_plot               #Plot of under-report
+View(reportDataFinal)   # table view of under-report
+
+
+# Log Chart
+# plot10k       # plot with state of florida
+plot_region     # plot without state of florida
+
 
 
