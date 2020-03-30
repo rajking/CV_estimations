@@ -1,4 +1,7 @@
-Florida Case Count, as of March 26, 2020
+Florida Case Count
+
+Data pulls from Nytimes Github repository of county level data:
+https://github.com/nytimes/covid-19-data
 
 Under Reporting Adapted from:
 https://cmmid.github.io/topics/covid19/severity/global_cfr_estimates.html
@@ -25,7 +28,8 @@ Miami Metro
   Broward County
   Palm Beach County
   
-  
-Florida Data from dept of health:
-https://fdoh.maps.arcgis.com/apps/opsdashboard/index.html#/8d0de33f260d444c852a615dc7837c86
+Jacksonville Metro
+Dival County
+Clay County
+St. Johns County
 
