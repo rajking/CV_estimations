@@ -12,8 +12,6 @@ library(stringr)
 library(ggthemes)
 library(RColorBrewer)
 library(ggrepel)
-library(rmarkdown)
-library(knitr)
 
 
 # Updated on 3/30/2020
@@ -257,8 +255,8 @@ lastDay <- max(lineDatanew_cases$days)+10
 
 # plot 10k y axis
 plot10k <- ggplot(data = lineDatanew_cases, aes(x=days, y=new_cases, colour = name)) +
-  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th new_cases") + 
-  ylab ("new_cases \n") +
+  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th case") + 
+  ylab ("Cases \n") +
   geom_text_repel(data = lineDatanew_cases %>% 
                     filter(days == last(days)), aes(label = name, 
                                                     x = days + 0.2, 
@@ -308,8 +306,8 @@ plot10k <- ggplot(data = lineDatanew_cases, aes(x=days, y=new_cases, colour = na
 region <- subset(lineDatanew_cases,name=="Miami" | name=="Tampa" | name=="Orlando" | name=="Jacksonville")
 
 plot_region <- ggplot(data = region, aes(x=days, y=new_cases, colour = name)) +
-  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th new_cases") + 
-  ylab ("new_cases \n") +
+  geom_line(size=0.9) + geom_point(size=1) + xlab ("\n Number of days since 10th case") + 
+  ylab ("Cases \n") +
   geom_text_repel(data = region %>% 
                     filter(days == last(days)), aes(label = name, 
                                                     x = days + 0.2, 
@@ -370,6 +368,8 @@ View(reportDataFinal)   # table view of under-report
 # Log Chart
 # plot10k       # plot with state of florida
 plot_region     # plot without state of florida
+
+
 
 
 
