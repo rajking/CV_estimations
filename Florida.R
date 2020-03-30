@@ -295,7 +295,7 @@ plot10k <- ggplot(data = lineDatanew_cases, aes(x=days, y=new_cases, colour = na
   
   scale_colour_manual(values=colourBlindPal) +
   theme_economist() + 
-  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of new_cases by days since 10th case") +
+  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of cases by days since 10th case") +
   theme(text = element_text(size=13)) +
   theme(legend.position = "none") +
   theme(legend.title=element_blank()) +
@@ -350,7 +350,7 @@ plot_region <- ggplot(data = region, aes(x=days, y=new_cases, colour = name)) +
   
   scale_colour_manual(values=colourBlindPal) +
   theme_economist() + 
-  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of new_cases by days since 10th case\n") +
+  ggtitle("Trajectory of case counts in Florida\n", subtitle = "Cumulative number of cases by days since 10th case\n") +
   theme(text = element_text(size=13)) +
   theme(legend.position = "none") +
   theme(legend.title=element_blank()) +
