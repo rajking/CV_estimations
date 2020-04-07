@@ -1,8 +1,18 @@
 Florida Case Count
 
-Data pulls from Nytimes Github repository of county level data:
-https://github.com/nytimes/covid-19-data
+4/7/2020:
+- Updated with 2 new files that each start case count at 50 instead of 10
 
+"Florida NYT 50.r" 
+  Data pulls from Nytimes Github repository of county level data:
+  https://github.com/nytimes/covid-19-data
+
+"FLorida DOH 50.r"
+  Data pulls directly from Florida Department of Health COVID19 report
+  https://open-fdoh.hub.arcgis.com/datasets/florida-covid19-case-line-data
+
+
+3/30/20
 Under Reporting Adapted from:
 https://cmmid.github.io/topics/covid19/severity/global_cfr_estimates.html
 
