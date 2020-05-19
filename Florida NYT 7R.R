@@ -277,7 +277,7 @@ plotformat <- function(var1) {
       Orlando Counties: Orange, Seminol, Osceola, Lake\n Jacksonville Counties: Duval, Clay, St.John\n", color = "#333333", size=3),
     coord_cartesian(xlim=c(0,lastday)), 
     scale_color_manual(values=colorBlindPal),
-    ggtitle("Number of new cases in Florida\n", subtitle = "Daily confirmed cases,by number of days since 10th case"),
+    ggtitle("Number of new cases in Florida\n", subtitle = "Seven-day rolling average of new cases, by number of days since 10th case"),
     theme_gdocs(),
     theme(text = element_text(size=13)),
     theme(legend.position = "none"),
