@@ -31,9 +31,14 @@ MaskEff<-rep(Meff,2)
 
 benefit<-data.frame(Mcov,Reff,MaskEff)
 
-ggplot(benefit, aes(x=Mcov,y=Reff,group=MaskEff)) +
-  geom_line()+ylim(0,4) + 
-  annotate("segment", linetype = "dashed", x = 0, xend = 1, y = 1, yend = 1)
+ggplot(benefit, aes(x=Mcov,y=Reff,group=MaskEff, color=factor(MaskEff))) +
+  geom_line()+
+  ylim(0,4) + 
+  annotate("segment", linetype = "dashed", x = 0, xend = 1, y = 1, yend = 1) + 
+  ggtitle("Effect of mask benefit and mask coverage on the reproduction number R") +
+  ylab("Reproduction Number R") + 
+  xlab("Mask Coverage Mcov") +
+  labs(color = "Mask Benefit")
 
 
 # calculate harm
@@ -50,10 +55,13 @@ MaskHaz <- rep(Mhaz,2)
 
 harm<-data.frame(Mcov,Rhaz,MaskHaz)
 
-ggplot(harm, aes(x=Mcov,y=Rhaz,group=MaskHaz)) +
+ggplot(harm, aes(x=Mcov,y=Rhaz,group=MaskHaz,color=factor(MaskEff))) +
   geom_line()+ylim(0,30) +
-  annotate("segment", linetype = "dashed", x = 0, xend = 1, y = 1, yend = 1)  
-
+  annotate("segment", linetype = "dashed", x = 0, xend = 1, y = 1, yend = 1) +  
+  ggtitle("Effect of mask hazard and mask coverage on the reproduction number R") +
+  ylab("Reproduction Number R") + 
+  xlab("Mask Coverage Mcov") +
+  labs(color = "Mask Hazard")
 
 
 
